@@ -1,0 +1,7 @@
+#!/bin/bash  
+source /opt/load-libs.sh 3
+cd /home/jorge.gacitua/experimentos/Sensitivity_Experiments
+export PATH=/opt/intel/oneapi/intelpython/latest/bin:/home/jorge.gacitua/miniconda3/bin:/home/jorge.gacitua/miniconda3/condabin:/opt/mpich/mpich-3.4.2/intel/2021.4.0/bin:/opt/intel/oneapi/vtune/2021.7.1/bin64:/opt/intel/oneapi/vpl/2021.6.0/bin:/opt/intel/oneapi/mpi/2021.4.0/libfabric/bin:/opt/intel/oneapi/mpi/2021.4.0/bin:/opt/intel/oneapi/mkl/2021.4.0/bin/intel64:/opt/intel/oneapi/itac/2021.4.0/bin:/opt/intel/oneapi/inspector/2021.4.0/bin64:/opt/intel/oneapi/dpcpp-ct/2021.4.0/bin:/opt/intel/oneapi/dev-utilities/2021.4.0/bin:/opt/intel/oneapi/debugger/10.2.4/gdb/intel64/bin:/opt/intel/oneapi/compiler/2021.4.0/linux/lib/oclfpga/llvm/aocl-bin:/opt/intel/oneapi/compiler/2021.4.0/linux/lib/oclfpga/bin:/opt/intel/oneapi/compiler/2021.4.0/linux/bin/intel64:/opt/intel/oneapi/compiler/2021.4.0/linux/bin:/opt/intel/oneapi/clck/2021.4.0/bin/intel64:/opt/intel/oneapi/advisor/2021.4.0/bin64:/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games:/snap/bin
+export OMP_NUM_THREADS=2
+
+python -u ./run_multiple_conf.py  > log_run_multiple.log
