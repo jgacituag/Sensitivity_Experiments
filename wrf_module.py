@@ -1148,141 +1148,161 @@ def advection(var, u, v, w, z, dy, dx, dz=None, zlev=False):
 #     return sol_
 
 def modify_input_sounding(my_file, conf):
-    # Read input sounding.
-    input_sounding = read_input_sounding(my_file)
+    cp = 1004.0
+    Rd = 287.0
+    P0 = 100000.0
+
+    # Read input sounding
+    input_sounding = read_input_sounding(my_file)  # must provide 'p' [hPa], 'theta' [K], 't' [K], etc.
 
     ########################################################################
     # Modify the input sounding wind profile.
     ########################################################################
-    if conf['modify_wind_profile'] :
-      input_sounding['u'][:] = 0.0 #Overwrite the original wind profile
-      input_sounding['v'][:] = 0.0
+    if conf.get('modify_wind_profile', False):
+        # Overwrite the original wind profile
+        input_sounding['u'][:] = 0.0
+        input_sounding['v'][:] = 0.0
 
-      if conf['shear_type'] == 'Linear' :
-         #Linear shear component - U wind
-         max_u = conf['shear_depth_u'] * conf['shear_strength_u']
-         input_sounding['u'] = input_sounding['height'] * conf['shear_strength_u']
-         input_sounding['u'][ input_sounding['height'] > conf['shear_depth_u'] ] = max_u
-         #Linear shear component - V wind
-         max_u = conf['shear_depth_v'] * conf['shear_strength_v']
-         input_sounding['v'] = input_sounding['height'] * conf['shear_strength_v']
-         input_sounding['v'][ input_sounding['height'] > conf['shear_depth_v'] ] = max_v
+        shear_type = conf.get('shear_type', 'Linear')
 
-      if conf['shear_type'] == 'Curved' :
-         #Maximum turning in wind direction (is a function of how much shear is explained by the curved part of the hodograph)
-         #The maximum turning is pi (half a circle), if half the shear is associated with the curved part then a quarter circle hodograph is obtained.
-         curved_shear_theta = conf['curved_shear_per'] * np.pi
-         #Curved hodograp up to certain level, then linear shear.
+        if shear_type == 'Linear':
+            # Linear shear component - U wind
+            max_u = conf['shear_depth_u'] * conf['shear_strength_u']
+            input_sounding['u'] = input_sounding['height'] * conf['shear_strength_u']
+            input_sounding['u'][input_sounding['height'] > conf['shear_depth_u']] = max_u
 
-         #Curved hodograp part
-         if conf['curved_shear_per'] > 0.0 :
-            curved_int_shear =  conf['int_total_shear'] * conf['curved_shear_per']
-            curved_dep_shear =  conf['total_shear_depth'] * conf['curved_shear_per']
-            curved_amp_shear =  curved_int_shear / curved_shear_theta
- 
-            mask = input_sounding['height'] <=  curved_dep_shear
-            input_sounding['v'][mask] = -1.0 * curved_amp_shear * np.sin( (input_sounding['height'][mask] / curved_dep_shear )* curved_shear_theta )
-            input_sounding['u'][mask] = -1.0 * curved_amp_shear * np.cos( (input_sounding['height'][mask] / curved_dep_shear )* curved_shear_theta )
-         else :
-            curved_amp_shear = 0.0
+            # Linear shear component - V wind
+            max_v = conf['shear_depth_v'] * conf['shear_strength_v']   # <-- was max_u by mistake
+            input_sounding['v'] = input_sounding['height'] * conf['shear_strength_v']
+            input_sounding['v'][input_sounding['height'] > conf['shear_depth_v']] = max_v
 
-         #Linear shear part 
-         u_ini = -1.0 * curved_amp_shear * np.cos( curved_shear_theta )  #U and V wind components at the base of the linear shear layer.
-         v_ini = -1.0 * curved_amp_shear * np.sin( curved_shear_theta )
+        elif shear_type == 'Curved':
+            # Maximum turning in wind direction
+            curved_shear_theta = conf['curved_shear_per'] * np.pi
 
-         linear_int_shear = conf['int_total_shear'] * (1.0 - conf['curved_shear_per'])
+            # --- Curved hodograph part (up to certain level) ---
+            if conf['curved_shear_per'] > 0.0:
+                curved_int_shear = conf['int_total_shear'] * conf['curved_shear_per']
+                curved_dep_shear = conf['total_shear_depth'] * conf['curved_shear_per']
+                curved_amp_shear = curved_int_shear / curved_shear_theta
 
-         u_fin = u_ini + linear_int_shear * np.sin( curved_shear_theta )
-         v_fin = v_ini - linear_int_shear * np.cos( curved_shear_theta )
+                mask = input_sounding['height'] <= curved_dep_shear
+                frac = (input_sounding['height'][mask] / curved_dep_shear) * curved_shear_theta
+                input_sounding['v'][mask] = -1.0 * curved_amp_shear * np.sin(frac)
+                input_sounding['u'][mask] = -1.0 * curved_amp_shear * np.cos(frac)
+            else:
+                curved_amp_shear = 0.0
+                curved_dep_shear = 0.0  # avoid reference before assignment if used below
 
-         mask = ( input_sounding['height'] >  curved_dep_shear ) & ( input_sounding['height'] <= conf['total_shear_depth'] )
-         input_sounding['v'][mask] = v_ini + ( v_fin - v_ini) * ( input_sounding['height'][mask] - curved_dep_shear ) / ( conf['total_shear_depth'] - curved_dep_shear ) 
-         input_sounding['u'][mask] = u_ini + ( u_fin - u_ini) * ( input_sounding['height'][mask] - curved_dep_shear ) / ( conf['total_shear_depth'] - curved_dep_shear )
+            # --- Linear shear part (above curved_dep_shear up to total depth) ---
+            u_ini = -1.0 * curved_amp_shear * np.cos(curved_shear_theta)
+            v_ini = -1.0 * curved_amp_shear * np.sin(curved_shear_theta)
 
-         #Constant wind part.
-         mask = input_sounding['height'] >=  conf['total_shear_depth']
-         input_sounding['v'][mask] = v_fin
-         input_sounding['u'][mask] = u_fin
-		 
-         linear_amp_shear = curved_int_shear / curved_shear_theta
+            linear_int_shear = conf['int_total_shear'] * (1.0 - conf['curved_shear_per'])
+            u_fin = u_ini + linear_int_shear * np.sin(curved_shear_theta)
+            v_fin = v_ini - linear_int_shear * np.cos(curved_shear_theta)
 
-      #print( input_sounding['u'] , input_sounding['v'] ) 
+            mask = (input_sounding['height'] > curved_dep_shear) & \
+                   (input_sounding['height'] <= conf['total_shear_depth'])
+            num = input_sounding['height'][mask] - curved_dep_shear
+            den = (conf['total_shear_depth'] - curved_dep_shear) if (conf['total_shear_depth'] > curved_dep_shear) else 1.0
+            w = num / den
+            input_sounding['u'][mask] = u_ini + (u_fin - u_ini) * w
+            input_sounding['v'][mask] = v_ini + (v_fin - v_ini) * w
 
+            # --- Constant wind above total shear depth ---
+            mask = input_sounding['height'] >= conf['total_shear_depth']
+            input_sounding['u'][mask] = u_fin
+            input_sounding['v'][mask] = v_fin
 
-      #Low level jet component 
-      input_sounding['u'] = input_sounding['u'] - conf['llj_amp'] * np.exp( -0.5 * ( conf['llj_h'] - input_sounding['height'] )**2 / conf['llj_width']**2  ) * np.sin( np.deg2rad(conf['llj_dir']) )
-      input_sounding['v'] = input_sounding['v'] - conf['llj_amp'] * np.exp( -0.5 * ( conf['llj_h'] - input_sounding['height'] )**2 / conf['llj_width']**2  ) * np.cos( np.deg2rad(conf['llj_dir']) )
+        # Low-level jet component
+        llj_gauss = np.exp(-0.5 * (conf['llj_h'] - input_sounding['height'])**2 / (conf['llj_width']**2))
+        input_sounding['u'] = input_sounding['u'] - conf['llj_amp'] * llj_gauss * np.sin(np.deg2rad(conf['llj_dir']))
+        input_sounding['v'] = input_sounding['v'] - conf['llj_amp'] * llj_gauss * np.cos(np.deg2rad(conf['llj_dir']))
 
-      #Add the surface wind speed to the entire profile.
-      input_sounding['u'] = input_sounding['u'] + conf['surf_u']
-      input_sounding['v'] = input_sounding['v'] + conf['surf_v']
+        # Add surface wind to the entire profile
+        input_sounding['u'] = input_sounding['u'] + conf['surf_u']
+        input_sounding['v'] = input_sounding['v'] + conf['surf_v']
 
-      if conf['remove_mean_wind']:
-          # Remove 0-6 km mean wind (this will keep the convection near the center of the
-          # domain for a longer time)
-          mask = input_sounding['height'] < 6000.0
-          mean_u = np.mean(input_sounding['u'][mask])
-          mean_v = np.mean(input_sounding['v'][mask])
-          input_sounding['u'] = input_sounding['u'] - mean_u
-          input_sounding['v'] = input_sounding['v'] - mean_v
-
+        if conf.get('remove_mean_wind', False):
+            # Remove 0–6 km mean wind (keep convection near domain center longer)
+            mask = input_sounding['height'] < 6000.0
+            mean_u = np.mean(input_sounding['u'][mask])
+            mean_v = np.mean(input_sounding['v'][mask])
+            input_sounding['u'] = input_sounding['u'] - mean_u
+            input_sounding['v'] = input_sounding['v'] - mean_v
 
     ########################################################################
     # Modify the input sounding theta profile.
     ########################################################################
-    if conf['modify_theta_profile']:
+    if conf.get('modify_theta_profile', False):
         input_sounding['theta'][:] = 0.0
         input_sounding['surf_theta'] = conf['surf_theta']
         input_sounding['theta'][0] = conf['surf_theta']
 
-        index = np.zeros(len(input_sounding['height'])).astype(int)
+        index = np.zeros(len(input_sounding['height']), dtype=int)
         for ii in range(len(conf['theta_layer_limits'])):
             mask = input_sounding['height'] >= conf['theta_layer_limits'][ii]
-            index[mask] = index[mask] + 1
+            index[mask] += 1
         index = index - 1
         delta_theta = conf['dthetadz_layer'][index]
 
         input_sounding['theta'][1:] = conf['surf_theta'] + np.cumsum(
-            delta_theta[1:] * (input_sounding['height'][1:] - input_sounding['height'][:-1]))
+            delta_theta[1:] * (input_sounding['height'][1:] - input_sounding['height'][:-1])
+        )
+
+        pi = ((input_sounding['p'] * 100.0) / P0) ** (Rd / cp)
+        input_sounding['t'] = input_sounding['theta'] * pi
 
     ########################################################################
-    # Modify stability
+    # Modify stability (acts on theta).
     ########################################################################
-    if conf['modify_stability']  :
-       #factor increases linearly with height. So multiplying factor * temperature can
-       #increase or decrease the stability. 
-       #factor = 1.0 + 0.01 * conf['stability_factor'] *  input_sounding['height'] / ( 10000.0 ) 
-       factor = np.sin( input_sounding['height'] * np.pi / (2*conf['stability_factor_height']) ) 
-       factor[ factor < 0.0 ] = 0.0                                                           
-       factor[ input_sounding['height'] > 2*conf['stability_factor_height'] ] = 0.0
-       factor = 1.0 + 0.01 * conf['stability_factor'] * factor
-       input_sounding['theta'] = factor * input_sounding['theta'] 
+    if conf.get('modify_stability', False):
+        # Smooth vertical factor (zero above 2*H)
+        H = conf['stability_factor_height']
+        factor = np.sin(input_sounding['height'] * np.pi / (2 * H))
+        factor[factor < 0.0] = 0.0
+        factor[input_sounding['height'] > 2 * H] = 0.0
+        factor = 1.0 + 0.01 * conf['stability_factor'] * factor
+
+        input_sounding['theta'] = factor * input_sounding['theta']
+
+        # Recompute T from theta with FIXED p (Exner)
+        pi = ((input_sounding['p'] * 100.0) / P0) ** (Rd / cp)
+        input_sounding['t'] = input_sounding['theta'] * pi
 
     ########################################################################
     # Modify the input sounding moisture profile.
     ########################################################################
-    if conf['modify_moisture_profile']:
-       if conf['dry_run']:
-          input_sounding['qv'][:] = 0.0  # Dry simulation.
-        
-       #Multiplicative increase/decrease of low level moisture
-       tmp_z = (-input_sounding['height'] + conf['low_level_moisture_height'])/250.0
-       tmp_factor = 1.0 + 0.01 * conf['low_level_moisture_mult_factor'] / ( 1.0 + np.exp( -tmp_z ) )
-       input_sounding['qv'] = input_sounding['qv'] * tmp_factor
+    if conf.get('modify_moisture_profile', False):
+        if conf.get('dry_run', False):
+            input_sounding['qv'][:] = 0.0  # Dry simulation.
 
-       #Multiplicative increase/decrease of mid-upper level moisture.
-       tmp_z = ( input_sounding['height'] - conf['mid_level_moisture_height'])/250.0
-       tmp_factor = 1.0 + 0.01 * conf['mid_level_moisture_mult_factor'] / ( 1.0 + np.exp( -tmp_z ) )
-       input_sounding['qv'] = input_sounding['qv'] * tmp_factor
+        # Multiplicative increase/decrease of low-level moisture
+        tmp_z = (-input_sounding['height'] + conf['low_level_moisture_height']) / 250.0
+        tmp_factor = 1.0 + 0.01 * conf['low_level_moisture_mult_factor'] / (1.0 + np.exp(-tmp_z))
+        input_sounding['qv'] = input_sounding['qv'] * tmp_factor
+
+        # Multiplicative increase/decrease of mid/upper-level moisture
+        tmp_z = (input_sounding['height'] - conf['mid_level_moisture_height']) / 250.0
+        tmp_factor = 1.0 + 0.01 * conf['mid_level_moisture_mult_factor'] / (1.0 + np.exp(-tmp_z))
+        input_sounding['qv'] = input_sounding['qv'] * tmp_factor
+
+        # Ensure T up-to-date before saturation (in case theta changed earlier)
+        # (If neither theta nor stability changed, T from read_input_sounding is already present.)
+        if 't' not in input_sounding or 'p' not in input_sounding:
+            pi = ((input_sounding['p'] * 100.0) / P0) ** (Rd / cp)
+            input_sounding['t'] = input_sounding['theta'] * pi
 
     ########################################################################
-    # Check saturation
+    # Check saturation (uses UPDATED T with FIXED p)
     ########################################################################
-       
     epsilon = 0.622
-    es = 6.112 * np.exp( 17.67 * ( input_sounding['t'] - 273.16 ) / ( input_sounding['t'] - 273.16 + 243.5 ) )                #[in hPa]
-    input_sounding['qvs'] = es * epsilon / ( input_sounding['p'] - ( 1 - epsilon ) * es ) * 1000.0                            #[in g/kg]
-    input_sounding['qv'][input_sounding['qv'] > input_sounding['qvs'] ] = input_sounding['qvs'][input_sounding['qv'] > input_sounding['qvs'] ]   #[remove qv values over saturation]
+    es = 6.112 * np.exp(17.67 * (input_sounding['t'] - 273.16) / (input_sounding['t'] - 273.16 + 243.5))  # hPa
+    input_sounding['qvs'] = es * epsilon / (input_sounding['p'] - (1 - epsilon) * es) * 1000.0  # g/kg
+
+    mask_sat = input_sounding['qv'] > input_sounding['qvs']
+    input_sounding['qv'][mask_sat] = input_sounding['qvs'][mask_sat]  # clip to saturation
 
 
     # Write input_sounding

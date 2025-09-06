@@ -13,8 +13,8 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # -------------------- Configuration --------------------
-data_root = "/home/jorge.gacitua/datosmunin2/EXPERIMENTS_UNWEATHER/DATA/TEST_Multi_8_vars_996"
-csv_path  = "/home/jorge.gacitua/datosmunin/Sensitivity_Experiments/sampling_batch_996.csv"
+data_root = "/home/jorge.gacitua/datosmunin2/EXPERIMENTS_UNWEATHER/DATA/TEST_Multi_4_vars"
+csv_path  = "/home/jorge.gacitua/datosmunin/Sensitivity_Experiments/sampling_batch_96.csv"
 
 # -------------------- Utility Functions --------------------
 def extract_profile(ncfile):
@@ -38,14 +38,19 @@ def extract_reflectivity_cube(ncfile):
 
 def extract_updraft_helicity(ncfile):
     print("Extracting updraft helicity...")
-    u = getvar(ncfile, 'ua', timeidx=ALL_TIMES)
-    v = getvar(ncfile, 'va', timeidx=ALL_TIMES)
-    w = getvar(ncfile, 'W', timeidx=ALL_TIMES)
-    z = getvar(ncfile, 'zstag', timeidx=ALL_TIMES)
-    mapfct = np.ones_like(z[:,0,:,:])
-    
-    uh_1_1p5 = to_np(udhel(zstag=z, mapfct=mapfct, u=u, v=v, wstag=w,bottom=1000, top=1500, dx=2000, dy=2000)).max(axis=(1, 2))
-    uh_1_6   = to_np(udhel(zstag=z, mapfct=mapfct, u=u, v=v, wstag=w,bottom=1000, top=6000, dx=2000, dy=2000)).max(axis=(1, 2))
+    try:
+        u = getvar(ncfile, 'ua', timeidx=ALL_TIMES)
+        v = getvar(ncfile, 'va', timeidx=ALL_TIMES)
+        w = getvar(ncfile, 'W', timeidx=ALL_TIMES)
+        z = getvar(ncfile, 'zstag', timeidx=ALL_TIMES)
+        mapfct = np.ones_like(z[:,0,:,:])
+        
+        uh_1_1p5 = to_np(udhel(zstag=z, mapfct=mapfct, u=u, v=v, wstag=w,bottom=1000, top=1500, dx=2000, dy=2000)).max(axis=(1, 2))
+        uh_1_6   = to_np(udhel(zstag=z, mapfct=mapfct, u=u, v=v, wstag=w,bottom=1000, top=6000, dx=2000, dy=2000)).max(axis=(1, 2))
+    except Exception as e:
+        print(f"[ERROR] Failed to extract updraft helicity: {e}")
+        uh_1_1p5 = np.full(ncfile.dimensions['Time'].size, np.nan)
+        uh_1_6 = np.full(ncfile.dimensions['Time'].size, np.nan)
     return uh_1_1p5, uh_1_6
 
 def extract_cape_mucape(ncfile):
@@ -69,11 +74,31 @@ def extract_cape_mucape(ncfile):
 
 def extract_scalar_timeseries(ncfile):
     print("Extracting scalar time series...")
-    times = to_np(getvar(ncfile, "XTIME"))
-    w = to_np(getvar(ncfile, "wa", timeidx=ALL_TIMES, method="cat"))
-    t = to_np(getvar(ncfile, "temp", timeidx=ALL_TIMES, method="cat"))
-    r = to_np(getvar(ncfile, "dbz", timeidx=ALL_TIMES, method="cat"))
-    p = to_np(getvar(ncfile, "RAINNC", timeidx=ALL_TIMES, method="cat"))
+    try:
+        times = to_np(getvar(ncfile, "XTIME"))
+    except Exception as e:
+        print(f"[ERROR] Failed to extract time variable: {e}")
+        times = np.arange(ncfile.dimensions['Time'].size)
+    try:
+        w = to_np(getvar(ncfile, "wa", timeidx=ALL_TIMES, method="cat"))
+    except Exception as e:
+        print(f"[ERROR] Failed to extract vertical velocity: {e}")
+        w = np.full((ncfile.dimensions['Time'].size, ncfile.dimensions['bottom_top'], ncfile.dimensions['south_north'], ncfile.dimensions['west_east']), np.nan)
+    try:
+        t = to_np(getvar(ncfile, "temp", timeidx=ALL_TIMES, method="cat"))
+    except Exception as e:
+        print(f"[ERROR] Failed to extract temperature: {e}")
+        t = np.full((ncfile.dimensions['Time'].size, ncfile.dimensions['bottom_top'], ncfile.dimensions['south_north'], ncfile.dimensions['west_east']), np.nan)
+    try:
+        r = to_np(getvar(ncfile, "dbz", timeidx=ALL_TIMES, method="cat"))
+    except Exception as e:
+        print(f"[ERROR] Failed to extract reflectivity: {e}")
+        r = np.full((ncfile.dimensions['Time'].size, ncfile.dimensions['bottom_top'], ncfile.dimensions['south_north'], ncfile.dimensions['west_east']), np.nan)
+    try:
+        p = to_np(getvar(ncfile, "RAINNC", timeidx=ALL_TIMES, method="cat"))
+    except Exception as e:
+        print(f"[ERROR] Failed to extract precipitation: {e}")
+        p = np.full((ncfile.dimensions['Time'].size, ncfile.dimensions['south_north'], ncfile.dimensions['west_east']), np.nan)
 
     stats = {
         'time': times,

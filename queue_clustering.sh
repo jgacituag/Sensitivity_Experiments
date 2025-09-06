@@ -9,7 +9,7 @@
 cd /home/jorge.gacitua/experimentos/Sensitivity_Experiments
 
 # Load conda into the environment
-source ~/miniconda3/etc/profile.d/conda.sh  # Adjust if using Anaconda or Mambaforge
+source /home/jorge.gacitua/salidas/miniconda3/etc/profile.d/conda.sh  # Adjust if using Anaconda or Mambaforge
 
 # Activate your conda environment
 conda activate wrf_python

@@ -1,89 +1,82 @@
+import sys
 import csv
-# Read the CSV file
-import pickle
-import numpy as np
-import os 
+import conf
 import wrf_module as wrf
-import conf   #Load the default configuration
-from multiprocessing import Pool
+import os
 
-def run_wrf(args,conf=conf):
-    #############################################################################################
-    # CONFIGURATION PARAMETERS (in a future version this can be an input to a function)
-    #############################################################################################
-    row, i = args
-    param1, param2, param3, param4 = map(float, row)
-    conf = conf.conf
-    conf['expname']   = 'TEST_Multi_4_vars_996_conf'
-    conf['run_num']   = i
-    conf['modelpath'] = '/home/jorge.gacitua/experimentos/em_quarter_ss'
-    conf['datapath']  = '/home/jorge.gacitua/experimentos'
+def run_wrf_single_conf(row, row_number):
+    param1, param2, param3, param4, param5 = map(float, row)
+    conf_dict = conf.conf
+    conf_dict['expname']   = 'Multi_5_vars_saltelli'
+    conf_dict['run_num']   = row_number
+    conf_dict['modelpath'] = '/home/jorge.gacitua/salidas/em_quarter_ss'
+    conf_dict['datapath']  = '/home/jorge.gacitua/salidas'
 
-    #Parameters controling the shape of the wind profile.
-    conf['modify_wind_profile'] = True  #Are we going to modify the original wind profile?
-    conf['remove_mean_wind']    = True  #True for convection experiments, false for mountain wave experiments.
-    conf['shear_type']          = 'Curved' #Posible choices: 'Linear','Curved'
+    # Wind profile
+    conf_dict['modify_wind_profile'] = True
+    conf_dict['remove_mean_wind']    = True
+    conf_dict['shear_type']          = 'Curved'
+    conf_dict['total_shear_depth']   = 4000+(param1*(8000-4000))
+    conf_dict['int_total_shear']     = 0.00001+(param2*(30-0))
+    conf_dict['curved_shear_per']    = param3
 
-    #For the Quarter shear case
-    conf['total_shear_depth']  = 4000+(param1*(8000-4000))    #Depth of circular shear. (tipical range [4000 , 8000]) 
-    conf['int_total_shear']    = 0+(param2*(30-0))      #Total integrated shear (in m/s, tacking curvature into account) (tipical range [0 , 30])
-    conf['curved_shear_per']   = param3       #Which proportion of the total shear depth will be curved. (tipical range [0 , 1])
+    conf_dict['shear_depth_u']    = 0.0
+    conf_dict['shear_strength_u'] = 5.0e-3
+    conf_dict['shear_depth_v']    = 8000.0
+    conf_dict['shear_strehgth_v'] = 0.0
 
-    #For the Linear shear case
-    conf['shear_depth_u']    = 0.0      #Heigth of no shear (for the u component a linear type shear is assumed)
-    conf['shear_strength_u'] = 5.0e-3   #Shear in m/s^2 (for the u component)
-    conf['shear_depth_v']    = 8000.0   #Heigth of no shear (for the v component)
-    conf['shear_strehgth_v'] = 0.0      #Maximum V-wind in m/s (for the v component a sine type shear is assumed)
+    conf_dict['llj_amp']   = 0.0
+    conf_dict['llj_h']     = 1500.0
+    conf_dict['llj_width'] = 500.0
+    conf_dict['llj_dir']   = 360.0
 
-    conf['llj_amp']         = 0.0      #Low level jet local maximum (for the u component)
-    conf['llj_h']           = 1500.0   #Low level jet heigth (for the u component)
-    conf['llj_width']       = 500.0    #Low level jet width  (for the u component)
-    conf['llj_dir']         = 360.0    #Wind direction for the LLJ. 
+    # Stability
+    conf_dict['modify_stability'] = True
+    conf_dict['stability_factor'] = -0.5+(param4*(3.0--0.5))
+    conf_dict['stability_factor_height'] = 5000 #2500+(param5*(10000-2500))#Height of maximum warming / cooling. (tipical range [2500 , 10000 ] )
 
-    #Parameters controling the stability (temperature profile)
-    conf['modify_stability'] = True          #Are we going to modify the original stability?
-    conf['stability_factor'] = -1.5+(param4*(1.5--1.5))          #Factor controling the stability change (tipical range [-1.5 , 1.5] )
-    conf['stability_factor_height'] = 5000 #2500+(param4*(10000-2500)) #Height of maximum warming / cooling. (tipical range [2500 , 10000 ] )
+    # Moisture
+    conf_dict['modify_moisture_profile'] = True
+    conf_dict['dry_run'] = False
+    conf_dict['low_level_moisture_height'] = 2000.0    #Low level moisture modification will take effect below this level.2000+(param8*(3000-2000))
+    conf_dict['low_level_moisture_mult_factor'] = -15+(param5*(30--15))
+    conf_dict['mid_level_moisture_height'] = 2000.0    #Mid level moisture modification will take effect above this level. 2000+(param8*(3000-2000))
+    conf_dict['mid_level_moisture_mult_factor'] = 0.0  #Moisture modification factor for mid levels (tipical range [-10.0 , 10.0 ] ) -10+(param7*(10--10))
 
-    #Parameters controling the shape of the moisture profile.
-    conf['modify_moisture_profile'] = False       #Are we going to modify the original moisture profile?
-    conf['dry_run']                 = False       #Assume 0.0 moisture content at all levels?
-    conf['low_level_moisture_height'] = 2000.0    #Low level moisture modification will take effect below this level.
-    conf['low_level_moisture_mult_factor'] = 0.0  #Moisture modification for low levels (tipical range [-15.0 , 15.0] )   
-    conf['mid_level_moisture_height'] = 2000.0    #Mid level moisture modification will take effect above this level.
-    conf['mid_level_moisture_mult_factor'] = 0.0  #Moisture modification factor for mid levels (tipical range [-10.0 , 10.0 ] )
+    # Sensitivity function
+    conf_dict['sf_type'] = 'mean_precipitation'
+    conf_dict['sf_percentile'] = 99.0
 
-    #Parameters controlling the sensitivity function to be used
-    conf['sf_type'] = 'mean_precipitation' 
-    conf['sf_percentile'] = 99.0 
+    # Model integration
+    conf_dict['run_model'] = True
+    conf_dict['plot_exp']  = False
+    conf_dict['model_xdomain'] = 2000.0 * 42
+    conf_dict['model_nx'] = 80
+    conf_dict['model_dx'] = 2000.0
+    conf_dict['model_dt'] = 12
+    conf_dict['model_nz'] = 41
+    conf_dict['model_dy'] = conf_dict['model_dx']
+    conf_dict['model_ny'] = conf_dict['model_nx']
 
-    conf['run_model'] = True  #Are we going to run the model?
-    conf['plot_exp']  = False  #Are we going to do detailed plots of the model solution?
+    # Set the number of threads for WRF to use all available cores
+    # This will be used in the wrf_module.py when calling wrf.exe
+    conf_dict['nthreads'] = int(os.environ.get('OMP_NUM_THREADS', '48'))
+    
+    print(f"Starting simulation {row_number} with {conf_dict['nthreads']} threads")
 
-    #Parameters controling the model parameters (parameters controlling the model integration)
-    conf['model_xdomain'] = 2000.0 * 42  #Do not change (total extension of the domain in the x direction, meters)
-    conf['model_nx'] = 80                #Number of grid points in the X direction (integer) 
-    conf['model_dx'] = 2000.0            #Model resolution 
-    conf['model_dt'] = 12                #Integration time step (seconds, integer)            
-    conf['model_nz'] = 41                #Number of vertical levels (integer)
-    conf['model_dy'] = conf['model_dx']  #Model resolution in the y-direction (for the moment we kept this equal to the resolution in the x-direction). 
-    conf['model_ny'] = conf['model_nx']  #Number of grid points in the y direction (for the moment we keep this constant). 
+    wrf.run_wrf(conf_dict)
+    
+    print(f"Completed simulation {row_number}")
 
-    #############################################################################################
-    #  CALL WRF MODEL
-    #############################################################################################
-    wrf.run_wrf( conf )
+if __name__ == "__main__":
+    start_idx = int(sys.argv[1])
+    end_idx   = int(sys.argv[2])
 
-
-csv_file_path = 'sampling_batch_996.csv'
-with open(csv_file_path, newline='') as csvfile:
-    csv_reader = csv.reader(csvfile)
-    next(csv_reader)  # Skip the header row if it exists
-
-
-    pool = Pool(processes=10)
-    #pool.map(run_wrf, csv_reader)
-    pool.map(run_wrf, [(row, row_number) for row_number, row in enumerate(csv_reader)])
-    pool.close()
-    pool.join()
-
+    #csv_file_path = 'sampling_batch_1000_8_variables.csv'
+    csv_file_path = 'saltelli_d5_1st_le1000.csv'
+    with open(csv_file_path, newline='') as csvfile:
+        csv_reader = csv.reader(csvfile)
+        next(csv_reader)  # skip header
+        for row_number, row in enumerate(csv_reader):
+            if start_idx <= row_number < end_idx:
+                run_wrf_single_conf(row, row_number)
