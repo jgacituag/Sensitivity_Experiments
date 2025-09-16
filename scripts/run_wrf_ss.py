@@ -2,8 +2,8 @@
 import pickle
 import numpy as np
 import os 
-import wrf_module as wrf
-import conf   #Load the default configuration
+import sensiwrf.wrf_module as wrf
+from sensiwrf import config as conf   #Load the default configuration
 
 #############################################################################################
 # CONFIGURATION PARAMETERS (in a future version this can be an input to a function)

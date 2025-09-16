@@ -1,8 +1,10 @@
-logs/
-*.log
-*.out
 __pycache__/
-*.pyc
-tmp.py
-nohup.out
-
+*.py[cod]
+.ipynb_checkpoints/
+logs/*.log
+logs/nohup.out
+experiments/*/artifacts/
+experiments/*/runs/
+*.nc
+*.npz
+*.wrfout*

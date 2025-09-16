@@ -1,7 +1,7 @@
 import sys
 import csv
-import conf
-import wrf_module as wrf
+import sensiwrf.wrf_module as wrf
+from sensiwrf import config as conf
 import os
 
 def run_wrf_single_conf(row, row_number):
