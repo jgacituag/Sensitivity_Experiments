@@ -1288,15 +1288,11 @@ def modify_input_sounding(my_file, conf):
         tmp_factor = 1.0 + 0.01 * conf['mid_level_moisture_mult_factor'] / (1.0 + np.exp(-tmp_z))
         input_sounding['qv'] = input_sounding['qv'] * tmp_factor
 
-        # Ensure T up-to-date before saturation (in case theta changed earlier)
-        # (If neither theta nor stability changed, T from read_input_sounding is already present.)
-        if 't' not in input_sounding or 'p' not in input_sounding:
-            pi = ((input_sounding['p'] * 100.0) / P0) ** (Rd / cp)
-            input_sounding['t'] = input_sounding['theta'] * pi
 
-    ########################################################################
-    # Check saturation (uses UPDATED T with FIXED p)
-    ########################################################################
+
+    pi = ((input_sounding['p'] * 100.0) / P0) ** (Rd / cp)
+    input_sounding['t'] = input_sounding['theta'] * pi
+
     epsilon = 0.622
     es = 6.112 * np.exp(17.67 * (input_sounding['t'] - 273.16) / (input_sounding['t'] - 273.16 + 243.5))  # hPa
     input_sounding['qvs'] = es * epsilon / (input_sounding['p'] - (1 - epsilon) * es) * 1000.0  # g/kg
