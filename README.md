@@ -3,23 +3,24 @@
 
 This repository contains an automated, modular, and scalable workflow for running idealized supercell simulations using the Weather Research and Forecasting (WRF) model. It is designed to take parameter samples (e.g., generated via SALib), dynamically modify the WRF `input_sounding` and `namelist.input`, and execute batches of simulations in a High-Performance Computing (HPC) environment via PBS.
 
-## 📂 Repository Structure
+## Repository Structure
 
 ```text
-wrf_supercell_sensitivity/
-├── README.md                   # This guide
-├── .gitignore                  # Ignored files (logs, NetCDF outputs, local configs)
-├── config.template.yaml        # Template for the master configuration file
-├── data/                       
-│   └── saltelli_d5.csv         # Parameter samples (SALib output)
+Sensitivity_Experiments/
+├── README.md                           # This guide
+├── .gitignore                          # Ignored files (logs, NetCDF outputs, local configs)
+├── environment.yml                     # Conda environment definition
+├── Exploracion_Simulaciones.ipynb      # Jupyter notebook for ensemble sanity check and visualization
 ├── src/                      
-│   ├── run_batch.py            # Main orchestrator (loops through CSV and runs WRF)
-│   └── wrf_utils.py            # Physics and utility functions (sounding & namelist editors)
-└── jobs/                     
-    └── submit_pbs.template.sh  # Template for the PBS job submission script
+│   ├── generate_sample.py              # Script to generate the SALib experimental design
+│   ├── run_batch.py                    # Main orchestrator (loops through CSV and runs WRF)
+│   └── wrf_utils.py                    # Physics and utility functions (sounding & namelist editors)
+└── templates/                     
+    ├── config.template.yaml            # Template for the master configuration file
+    └── submit_pbs.template.sh          # Template for the PBS job submission script
 ``` 
 
-## ⚙️ Setup & Installation
+## Setup & Installation
 
 ### 1. Clone the repository
 ```bash
