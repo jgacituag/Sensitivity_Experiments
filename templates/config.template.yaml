@@ -1,0 +1,79 @@
+# config.template.yaml - Base configuration for Idealized WRF Supercell Simulations
+
+paths:
+  wrf_base: "/path/to/your/em_quarter_ss"
+  output_dir: "/path/to/your/output_folder"
+  csv_file: "./saltelli_d5.csv"
+
+execution:
+  expname: "TEST_Idealized_Supercell"
+  nthreads: 48
+  run_model: True
+  plot_exp: False        # Recommended False for HPC batch runs
+  plot_types:            # Ignored if plot_exp is False
+    - "ref_vertvel"
+    - "init_sounding"
+
+wrf_params:
+  # -------------------------------------------------------------------------
+  # Domain and Model Integration
+  # -------------------------------------------------------------------------
+  model_xdomain: 84000.0 # 2000.0 * 42
+  model_nx: 80
+  model_ny: 80
+  model_nz: 41
+  model_dx: 2000.0
+  model_dy: 2000.0
+  model_dt: 12
+  model_dt_fract_num: 0
+  model_dt_fract_den: 1
+
+  # -------------------------------------------------------------------------
+  # Wind Profile & Shear
+  # -------------------------------------------------------------------------
+  modify_wind_profile: True
+  remove_mean_wind: True
+  shear_type: "Curved"
+  
+  # Linear shear
+  shear_depth_u: 0.0
+  shear_strength_u: 5.0e-3
+  shear_depth_v: 8000.0
+  shear_strength_v: 0.0
+  
+  # Curved shear (Note: pi/2 is approx 1.570796)
+  shear_freq_v: 1.570796 
+  shear_amp_v: 0.0
+  total_shear_depth: 6000.0
+  int_total_shear: 0.015
+  curved_shear_per: 0.5
+  
+  # Low-Level Jet & Surface Wind
+  llj_amp: 0.0
+  llj_h: 1500.0
+  llj_width: 500.0
+  llj_dir: 360.0
+  surf_u: 0.0
+  surf_v: 0.0
+
+  # -------------------------------------------------------------------------
+  # Temperature & Stability Profile
+  # -------------------------------------------------------------------------
+  modify_stability: False
+  stability_factor: -1.0
+  stability_factor_height: 10000.0
+
+  modify_theta_profile: False
+  surf_theta: 288.0
+  theta_layer_limits: [0.0, 3000.0, 15000.0]
+  dthetadz_layer: [0.004, 0.004, 0.004]
+
+  # -------------------------------------------------------------------------
+  # Moisture Profile
+  # -------------------------------------------------------------------------
+  modify_moisture_profile: False
+  dry_run: False
+  low_level_moisture_height: 2000.0
+  low_level_moisture_mult_factor: 0.0
+  mid_level_moisture_height: 2000.0
+  mid_level_moisture_mult_factor: 0.0

@@ -1,0 +1,12 @@
+name: Sensitivity_Experiments_env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.10
+  - numpy
+  - pyyaml
+  - netcdf4
+  - wrf-python
+  - pandas
+  - salib

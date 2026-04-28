@@ -1,10 +1,21 @@
+# Local configuration and execution scripts (Use templates instead)
+config.yaml
+submit_pbs.sh
+
+# Cluster logs and standard outputs
+logs/
+*.log
+*.out
+*.err
+
+# WRF execution outputs and temporary directories
+Outputs/
+*.nc
+
+# Python caches and Jupyter notebook checkpoints
 __pycache__/
 *.py[cod]
 .ipynb_checkpoints/
-logs/*.log
-logs/nohup.out
-experiments/*/artifacts/
-experiments/*/runs/
-*.nc
-*.npz
-*.wrfout*
+
+# Generated parameter samples
+data/*.csv
